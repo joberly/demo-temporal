@@ -1,13 +1,17 @@
-version: '3.7'
+version: '3.8'
 
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
+    environment:
+      - DEMO_IMAGE_DIR=/uploads
     # Temporal will use 8080 so use 8081 instead
     ports:
       - 8081:8080
+    volumes:
+      - api-uploads:/uploads
     networks:
       - backend
 
@@ -57,3 +61,4 @@ networks:
 volumes:
   postgres-data:
   grafana-storage:
+  api-uploads:

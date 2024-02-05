@@ -13,6 +13,7 @@ func main() {
 		fx.Provide(
 			NewLogger,
 			NewRouter,
+			api.NewConfig,
 			api.New,
 		),
 		fx.Invoke(func(a *api.Api) {

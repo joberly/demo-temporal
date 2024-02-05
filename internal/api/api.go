@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
@@ -11,12 +13,14 @@ import (
 type Api struct {
 	Router *gin.Engine
 	Logger *zap.Logger
+	Config *Config
 }
 
-func New(router *gin.Engine, logger *zap.Logger) (*Api, error) {
+func New(router *gin.Engine, logger *zap.Logger, config *Config) (*Api, error) {
 	return &Api{
 		Router: router,
 		Logger: logger,
+		Config: config,
 	}, nil
 }
 
@@ -32,10 +36,27 @@ func (a *Api) Run() {
 }
 
 func (a *Api) uploadHandler(c *gin.Context) {
-	// This is where you would put your image upload logic.
-	// For now, we'll just log the image ID.
-	a.Logger.Info("Received image upload request", zap.String("imageID", "123"))
-	c.JSON(http.StatusAccepted, gin.H{"id": "123"})
+	file, err := c.FormFile("file")
+	if err != nil {
+		a.Logger.Error("Failed to parse form", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	uuid := uuid.New().String()
+	ingestFilePath := filepath.Join(a.Config.ImageDir, uuid+filepath.Ext(file.Filename))
+
+	if err := c.SaveUploadedFile(file, ingestFilePath); err != nil {
+		a.Logger.Error("Failed to save file", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		return
+	}
+
+	a.Logger.Info("recieved file",
+		zap.String("uuid", uuid),
+		zap.String("path", ingestFilePath),
+	)
+	c.JSON(http.StatusAccepted, gin.H{"message": "file uploaded", "id": uuid})
 }
 
 func (a *Api) statusHandler(c *gin.Context) {
