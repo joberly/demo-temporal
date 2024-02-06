@@ -34,7 +34,7 @@ type Api struct {
 	client client.Client
 }
 
-func New(params *ApiParams) (*Api, error) {
+func New(params ApiParams) (*Api, error) {
 	return &Api{
 		router: params.Router,
 		logger: params.Logger,
