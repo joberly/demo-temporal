@@ -2,7 +2,9 @@ package api
 
 import (
 	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/joberly/demo-temporal/workflows"
 
@@ -98,14 +100,50 @@ func (a *Api) uploadHandler(c *gin.Context) {
 	)
 }
 
+func (a *Api) downloadHandler(c *gin.Context) {
+	imageID := c.Param("imageId")
+
+	// check the image id to be sure it's just a uuid
+	regexPattern := `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`
+	matched, _ := regexp.MatchString(regexPattern, uuid)
+	if !matched {
+		a.logger.Error("invalid image id", zap.String("imageId", imageID))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"imageId": imageID,
+			"error":   "invalid image id",
+		})
+		return
+	}
+
+	// check if the file exists
+	downloadFilePath := filepath.Join(a.config.ProcessedDir, imageID)
+	_, err := os.Stat(downloadFilePath)
+	if os.IsNotExist(err) {
+		a.logger.Error("file not found", zap.String("imageId", imageID))
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+	if err != nil {
+		a.logger.Error("failed to stat file", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"imageId": imageID,
+			"error":   "failed to stat file",
+		})
+		return
+	}
+
+	// serve the file
+	c.File(downloadFilePath)
+}
+
 func (a *Api) statusHandler(c *gin.Context) {
 	runID := c.Param("runId")
 	workflowID := c.Param("workflowId")
 
 	a.logger.Info("received image status request", zap.String("runId", runID))
 
-	// query Temporal for the status of the workflow
-	desc, err := a.client.DescribeWorkflowExecution(c.Request.Context(),
+	// get Temporal workflow status
+	_, err := a.client.DescribeWorkflowExecution(c.Request.Context(),
 		workflowID, runID)
 	if err != nil {
 		switch err.(type) {
@@ -121,16 +159,32 @@ func (a *Api) statusHandler(c *gin.Context) {
 			})
 		default:
 			a.logger.Error("failed to get status", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get status"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get execution status"})
 		}
 		return
+	}
+
+	// query workflow status
+	var status workflows.ImageProcessingWorkflowStatus
+	encVal, err := a.client.QueryWorkflow(c.Request.Context(), workflowID, runID, "status")
+	if err != nil {
+		a.logger.Error("failed to query workflow status", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get detailed status"})
+	}
+
+	// decode status
+	err = encVal.Get(&status)
+	if err != nil {
+		a.logger.Error("failed to decode status", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode status"})
 	}
 
 	c.JSON(http.StatusOK,
 		gin.H{
 			"workflowId": workflowID,
 			"runId":      runID,
-			"status":     desc.WorkflowExecutionInfo.GetStatus().String(),
+			"status":     status.Status,
+			"error":      status.Error,
 		},
 	)
 }
