@@ -4,67 +4,124 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/joberly/demo-temporal/workflows"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/client"
 	"go.uber.org/zap"
 )
 
 type Api struct {
-	Router *gin.Engine
-	Logger *zap.Logger
-	Config *Config
+	router *gin.Engine
+	logger *zap.Logger
+	config *Config
+	client client.Client
 }
 
-func New(router *gin.Engine, logger *zap.Logger, config *Config) (*Api, error) {
+func New(params *ApiParams) (*Api, error) {
 	return &Api{
-		Router: router,
-		Logger: logger,
-		Config: config,
+		router: params.Router,
+		logger: params.Logger,
+		config: params.Config,
+		client: params.Client,
 	}, nil
 }
 
 func (a *Api) Run() {
-	a.Router.POST("/upload", a.uploadHandler)
-	a.Router.GET("/status/:id", a.statusHandler)
-	a.Router.GET("/health", a.healthHandler)
-	a.Router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	a.router.POST("/upload", a.uploadHandler)
+	a.router.GET("/status/:id", a.statusHandler)
+	a.router.GET("/health", a.healthHandler)
+	a.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	if err := a.Router.Run(":8080"); err != nil {
-		a.Logger.Error("Failed to start server", zap.Error(err))
+	if err := a.router.Run(":8080"); err != nil {
+		a.logger.Error("failed to start server", zap.Error(err))
 	}
 }
 
 func (a *Api) uploadHandler(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		a.Logger.Error("Failed to parse form", zap.Error(err))
+		a.logger.Error("failed to parse form", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
 		return
 	}
 
 	uuid := uuid.New().String()
-	ingestFilePath := filepath.Join(a.Config.ImageDir, uuid+filepath.Ext(file.Filename))
+	uploadFilePath := filepath.Join(a.config.UploadDir, uuid)
 
-	if err := c.SaveUploadedFile(file, ingestFilePath); err != nil {
-		a.Logger.Error("Failed to save file", zap.Error(err))
+	if err := c.SaveUploadedFile(file, uploadFilePath); err != nil {
+		a.logger.Error("failed to save file", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
 		return
 	}
 
-	a.Logger.Info("recieved file",
+	a.logger.Info("recieved file",
 		zap.String("uuid", uuid),
-		zap.String("path", ingestFilePath),
+		zap.String("path", uploadFilePath),
 	)
-	c.JSON(http.StatusAccepted, gin.H{"message": "file uploaded", "id": uuid})
+
+	// start ImageProcessingWorkflow
+	wfOpts := client.StartWorkflowOptions{
+		ID:        uuid,
+		TaskQueue: a.config.TaskQueue,
+	}
+	wfRun, err := a.client.ExecuteWorkflow(c.Request.Context(),
+		wfOpts, workflows.ImageProcessingWorkflow, uuid)
+	if err != nil {
+		a.logger.Error("failed to start workflow", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start process"})
+		return
+	}
+
+	// workflow started successfully
+	c.JSON(http.StatusAccepted,
+		gin.H{
+			"message":    "file uploaded",
+			"imageId":    uuid,
+			"workflowId": wfRun.GetID(),
+			"runId":      wfRun.GetRunID(),
+		},
+	)
 }
 
 func (a *Api) statusHandler(c *gin.Context) {
-	imageID := c.Param("id")
-	// This is where you would put your image status logic.
-	// For now, we'll just log the image ID.
-	a.Logger.Info("Received image status request", zap.String("imageID", imageID))
-	c.JSON(http.StatusOK, gin.H{"status": "processing"})
+	runID := c.Param("runId")
+	workflowID := c.Param("workflowId")
+
+	a.logger.Info("received image status request", zap.String("runId", runID))
+
+	// query Temporal for the status of the workflow
+	desc, err := a.client.DescribeWorkflowExecution(c.Request.Context(),
+		workflowID, runID)
+	if err != nil {
+		switch err.(type) {
+		case *serviceerror.InvalidArgument:
+			a.logger.Info("workflow not found",
+				zap.String("workflowId", workflowID),
+				zap.String("runId", runID),
+			)
+			c.JSON(http.StatusNotFound, gin.H{
+				"workflowId": workflowID,
+				"runId":      runID,
+				"error": "not found"}
+			)
+		default:
+			a.logger.Error("failed to get status", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get status"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK,
+		gin.H{
+			"workflowId": workflowID,
+			"runId":      runID,
+			"status":     desc.WorkflowExecutionInfo.GetStatus().String(),
+		},
+	)
 }
 
 func (a *Api) healthHandler(c *gin.Context) {

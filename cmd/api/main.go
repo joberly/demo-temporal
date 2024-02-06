@@ -14,6 +14,7 @@ func main() {
 			NewLogger,
 			NewRouter,
 			api.NewConfig,
+			api.NewTemporalClient,
 			api.New,
 		),
 		fx.Invoke(func(a *api.Api) {

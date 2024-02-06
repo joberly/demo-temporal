@@ -290,6 +290,7 @@ go.temporal.io/api/workflowservice/v1
 go.temporal.io/api/workflowservicemock/v1
 # go.temporal.io/sdk v1.25.1
 ## explicit; go 1.20
+go.temporal.io/sdk/client
 go.temporal.io/sdk/converter
 go.temporal.io/sdk/internal
 go.temporal.io/sdk/internal/common
