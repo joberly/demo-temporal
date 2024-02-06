@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - DEMO_UPLOAD_DIR=/upload
+      - DEMO_PROCESSED_DIR=/processed
+      - DEMO_TEMPORAL_HOST=host.docker.internal
+    # Temporal will use 8080 so use 8081 instead
+    ports:
+      - 8081:8080
+    depends_on:
+      - worker
+    volumes:
+      - upload:/upload
+      - processed:/processed
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - DEMO_UPLOAD_DIR=/uploads
+      - DEMO_WORKING_DIR=/working
+      - DEMO_PROCESSED_DIR=/processed
+      - DEMO_TEMPORAL_HOST=host.docker.internal
+    volumes:
+      - upload:/uploads
+      - working:/working
+      - processed:/processed
+    networks:
+      - backend
+  
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION}
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION}
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  grafana-storage:
+  upload:
+  working:
+  processed:

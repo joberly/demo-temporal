@@ -1,0 +1,19 @@
+# build stage
+FROM golang:1.21 AS builder
+WORKDIR /app
+
+COPY . .
+
+WORKDIR /app/cmd/api
+
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api .
+
+# runtime stage
+FROM alpine:latest
+WORKDIR /root/
+
+COPY --from=builder /app/cmd/api/api .
+
+EXPOSE 8080
+
+CMD ["./api"]
