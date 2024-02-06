@@ -1,6 +1,8 @@
 package workflows
 
 import (
+	"time"
+
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -14,6 +16,12 @@ type ImageProcessingWorkflowStatus struct {
 // ImageProcessingWorkflow is a Temporal workflow that processes an image.
 func ImageProcessingWorkflow(ctx workflow.Context, imageID string) error {
 	workflow.GetLogger(ctx).Info("starting ImageProcessingWorkflow", "imageID", imageID)
+
+	// setup a timeout for all activities
+	ao := workflow.ActivityOptions{
+		StartToCloseTimeout: time.Minute * 5,
+	}
+	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	// status of the workflow reported back via query
 	status := ImageProcessingWorkflowStatus{
