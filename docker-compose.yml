@@ -8,6 +8,7 @@ services:
     environment:
       - DEMO_UPLOAD_DIR=/upload
       - DEMO_PROCESSED_DIR=/processed
+      - DEMO_TEMPORAL_HOST=host.docker.internal
     # Temporal will use 8080 so use 8081 instead
     ports:
       - 8081:8080
@@ -27,6 +28,7 @@ services:
       - DEMO_UPLOAD_DIR=/uploads
       - DEMO_WORKING_DIR=/working
       - DEMO_PROCESSED_DIR=/processed
+      - DEMO_TEMPORAL_HOST=host.docker.internal
     volumes:
       - upload:/uploads
       - working:/working
