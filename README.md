@@ -1,5 +1,21 @@
 # demo-temporal
+
 Demo application built with Temporal in Golang
+
+## Description
+
+The demo uses Temporal to manage an image processing workflow.
+
+The image processing workflow takes an uploaded image, ensures it's of a
+valid image type, converts it to grayscale, and makes the resulting image
+available for download.
+
+To access this workflow, an API is provided on localhost port 8081. This
+API has an /upload path to which an image may be uploaded. This starts the
+workflow running. The /status/:workflowID/run:runID queries the status of
+the workflow given information returned from the upload. Once complete,
+the status will read "processing complete". At that point, the result image
+can be downloaded from the /download/:imageID API path.
 
 ## Running
 
@@ -45,11 +61,10 @@ Open `http://localhost:8081/download/<imageId>` with your browser, replacing the
    the signed URL from the backend to upload the image directly to S3. The 
    backend could have some kind of process that handles S3 notifications and
    start the image processing workflow once the image is fully uploaded to S3.
-2. Everything needs unit tests badly. :)
+2. Everything needs unit tests badly. Definitely needs error path testing. :)
 3. API needs standardization. Same for the workflow status that gets returned
    from the API status endpoint.
-4. There's no auth so please don't run this publicly. The image ID isn't even
-   really large enough to 
-5. Status needs to be updated when workflow is complete.
-6. There are no neat Grafana dashboards for service status.
-7. The worker process does not provide an endpoint for Prometheus to scrape.
+4. There's no auth so please don't run this publicly. The image ID probably 
+   isn't even really large enough to make it hard to guess.
+5. There are no neat Grafana dashboards for service status.
+6. The worker process does not provide an endpoint for Prometheus to scrape.

@@ -62,6 +62,7 @@ func ImageProcessingWorkflow(ctx workflow.Context, imageID string) error {
 	}
 
 	// workflow successfully completed
+	status.Status = "processing complete"
 	workflow.GetLogger(ctx).Info("image processing complete", "imageID", imageID)
 	return nil
 }
