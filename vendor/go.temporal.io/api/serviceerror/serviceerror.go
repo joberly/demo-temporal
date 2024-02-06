@@ -22,7 +22,7 @@
 
 package serviceerror
 
-import "google.golang.org/grpc/status"
+import "github.com/gogo/status"
 
 type (
 	ServiceError interface {

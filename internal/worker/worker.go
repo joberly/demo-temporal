@@ -3,7 +3,6 @@ package worker
 import (
 	"github.com/joberly/demo-temporal/activities"
 	"github.com/joberly/demo-temporal/workflows"
-
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.uber.org/fx"

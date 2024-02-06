@@ -28,19 +28,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gogo/protobuf/proto"
 	"go.temporal.io/api/batch/v1"
 	"go.temporal.io/api/command/v1"
 	"go.temporal.io/api/common/v1"
 	"go.temporal.io/api/failure/v1"
 	"go.temporal.io/api/history/v1"
-	"go.temporal.io/api/nexus/v1"
 	"go.temporal.io/api/query/v1"
 	"go.temporal.io/api/schedule/v1"
 	"go.temporal.io/api/update/v1"
 	"go.temporal.io/api/workflow/v1"
 	"go.temporal.io/api/workflowservice/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 )
 
 // VisitPayloadsContext provides Payload context for visitor functions.
@@ -151,23 +150,25 @@ func NewFailureVisitorInterceptor(options FailureVisitorInterceptorOptions) (grp
 	}, nil
 }
 
-func visitPayload(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, msg *common.Payload) (*common.Payload, error) {
+func visitPayload(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, msg *common.Payload) error {
 	ctx.SinglePayloadRequired = true
 
 	newPayloads, err := options.Visitor(ctx, []*common.Payload{msg})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(newPayloads) != 1 {
-		return nil, fmt.Errorf("visitor func must return 1 payload when SinglePayloadRequired = true")
+		return fmt.Errorf("visitor func must return 1 payload when SinglePayloadRequired = true")
 	}
 
-	return newPayloads[0], nil
+	*msg = *newPayloads[0]
+
+	return nil
 }
 
 func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, objs ...interface{}) error {
-	for i, obj := range objs {
+	for _, obj := range objs {
 		ctx.SinglePayloadRequired = false
 
 		switch o := obj.(type) {
@@ -175,17 +176,14 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 			if o == nil {
 				continue
 			}
-			no, err := visitPayload(ctx, options, o)
+			err := visitPayload(ctx, options, o)
 			if err != nil {
 				return err
 			}
-			objs[i] = no
 		case map[string]*common.Payload:
-			for ix, x := range o {
-				if nx, err := visitPayload(ctx, options, x); err != nil {
+			for _, x := range o {
+				if err := visitPayload(ctx, options, x); err != nil {
 					return err
-				} else {
-					o[ix] = nx
 				}
 			}
 		case *common.Payloads:
@@ -738,7 +736,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				o.GetWorkflowExecutionUpdateAcceptedEventAttributes(),
 				o.GetWorkflowExecutionUpdateCompletedEventAttributes(),
 				o.GetWorkflowExecutionUpdateRejectedEventAttributes(),
-				o.GetWorkflowExecutionUpdateRequestedEventAttributes(),
 				o.GetWorkflowPropertiesModifiedEventAttributes(),
 				o.GetWorkflowPropertiesModifiedExternallyEventAttributes(),
 				o.GetWorkflowTaskFailedEventAttributes(),
@@ -960,20 +957,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				return err
 			}
 
-		case *history.WorkflowExecutionUpdateRequestedEventAttributes:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetRequest(),
-			); err != nil {
-				return err
-			}
-
 		case *history.WorkflowPropertiesModifiedEventAttributes:
 
 			if o == nil {
@@ -1012,76 +995,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				ctx,
 				options,
 				o.GetFailure(),
-			); err != nil {
-				return err
-			}
-
-		case *nexus.Request:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetStartOperation(),
-			); err != nil {
-				return err
-			}
-
-		case *nexus.Response:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetStartOperation(),
-			); err != nil {
-				return err
-			}
-
-		case *nexus.StartOperationRequest:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetPayload(),
-			); err != nil {
-				return err
-			}
-
-		case *nexus.StartOperationResponse:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetSyncSuccess(),
-			); err != nil {
-				return err
-			}
-
-		case *nexus.StartOperationResponse_Sync:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetPayload(),
 			); err != nil {
 				return err
 			}
@@ -1223,27 +1136,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				return err
 			}
 
-		case []*workflow.CallbackInfo:
-			for _, x := range o {
-				if err := visitPayloads(ctx, options, x); err != nil {
-					return err
-				}
-			}
-
-		case *workflow.CallbackInfo:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetLastAttemptFailure(),
-			); err != nil {
-				return err
-			}
-
 		case *workflow.NewWorkflowExecutionInfo:
 
 			if o == nil {
@@ -1381,7 +1273,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 			if err := visitPayloads(
 				ctx,
 				options,
-				o.GetCallbacks(),
 				o.GetPendingActivities(),
 				o.GetWorkflowExecutionInfo(),
 			); err != nil {
@@ -1505,20 +1396,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				o.GetHeader(),
 				o.GetHeartbeatDetails(),
 				o.GetInput(),
-			); err != nil {
-				return err
-			}
-
-		case *workflowservice.PollNexusTaskQueueResponse:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetRequest(),
 			); err != nil {
 				return err
 			}
@@ -1719,20 +1596,6 @@ func visitPayloads(ctx *VisitPayloadsContext, options *VisitPayloadsOptions, obj
 				ctx,
 				options,
 				o.GetFailures(),
-			); err != nil {
-				return err
-			}
-
-		case *workflowservice.RespondNexusTaskCompletedRequest:
-
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitPayloads(
-				ctx,
-				options,
-				o.GetResponse(),
 			); err != nil {
 				return err
 			}
@@ -2226,26 +2089,6 @@ func visitFailures(ctx *VisitFailuresContext, options *VisitFailuresOptions, obj
 				return err
 			}
 
-		case []*workflow.CallbackInfo:
-			for _, x := range o {
-				if err := visitFailures(ctx, options, x); err != nil {
-					return err
-				}
-			}
-
-		case *workflow.CallbackInfo:
-			if o == nil {
-				continue
-			}
-			ctx.Parent = o
-			if err := visitFailures(
-				ctx,
-				options,
-				o.GetLastAttemptFailure(),
-			); err != nil {
-				return err
-			}
-
 		case []*workflow.PendingActivityInfo:
 			for _, x := range o {
 				if err := visitFailures(ctx, options, x); err != nil {
@@ -2274,7 +2117,6 @@ func visitFailures(ctx *VisitFailuresContext, options *VisitFailuresOptions, obj
 			if err := visitFailures(
 				ctx,
 				options,
-				o.GetCallbacks(),
 				o.GetPendingActivities(),
 			); err != nil {
 				return err

@@ -11,6 +11,8 @@ services:
     # Temporal will use 8080 so use 8081 instead
     ports:
       - 8081:8080
+    depends_on:
+      - worker
     volumes:
       - upload:/upload
       - processed:/processed
@@ -40,8 +42,6 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
     ports:
       - 9090:9090
-    depends_on:
-      - postgres
     networks:
       - backend
 
