@@ -11,9 +11,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
+// ApiParams holds the dependencies for the API.
+type ApiParams struct {
+	fx.In
+	Router *gin.Engine
+	Logger *zap.Logger
+	Config *Config
+	Client client.Client
+}
+
+// Api is the API server.
 type Api struct {
 	router *gin.Engine
 	logger *zap.Logger
@@ -106,8 +117,8 @@ func (a *Api) statusHandler(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"workflowId": workflowID,
 				"runId":      runID,
-				"error": "not found"}
-			)
+				"error":      "not found",
+			})
 		default:
 			a.logger.Error("failed to get status", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get status"})

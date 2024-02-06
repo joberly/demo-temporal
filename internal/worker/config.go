@@ -1,4 +1,4 @@
-package api
+package worker
 
 import (
 	"encoding/json"
@@ -8,9 +8,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// Config holds the configuration for the API.
 type Config struct {
 	UploadDir    string
+	WorkingDir   string
 	ProcessedDir string
 	TemporalHost string
 	TemporalPort string
@@ -21,6 +21,7 @@ func NewConfig(logger *zap.Logger) (*Config, error) {
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("demo")
 	viper.SetDefault("UPLOAD_DIR", "/tmp/uploads")
+	viper.SetDefault("WORKING_DIR", "/tmp/working")
 	viper.SetDefault("PROCESSED_DIR", "/tmp/processed")
 	viper.SetDefault("TEMPORAL_HOST", "localhost")
 	viper.SetDefault("TEMPORAL_PORT", "7233")
@@ -28,6 +29,7 @@ func NewConfig(logger *zap.Logger) (*Config, error) {
 
 	config := &Config{
 		UploadDir:    viper.GetString("UPLOAD_DIR"),
+		WorkingDir:   viper.GetString("WORKING_DIR"),
 		ProcessedDir: viper.GetString("PROCESSED_DIR"),
 		TemporalHost: viper.GetString("TEMPORAL_HOST"),
 		TemporalPort: viper.GetString("TEMPORAL_PORT"),

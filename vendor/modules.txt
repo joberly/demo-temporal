@@ -290,6 +290,7 @@ go.temporal.io/api/workflowservice/v1
 go.temporal.io/api/workflowservicemock/v1
 # go.temporal.io/sdk v1.25.1
 ## explicit; go 1.20
+go.temporal.io/sdk/activity
 go.temporal.io/sdk/client
 go.temporal.io/sdk/converter
 go.temporal.io/sdk/internal
@@ -304,6 +305,7 @@ go.temporal.io/sdk/internal/log
 go.temporal.io/sdk/internal/protocol
 go.temporal.io/sdk/log
 go.temporal.io/sdk/temporal
+go.temporal.io/sdk/worker
 go.temporal.io/sdk/workflow
 # go.uber.org/atomic v1.11.0
 ## explicit; go 1.18
@@ -350,6 +352,12 @@ golang.org/x/exp/slices
 golang.org/x/exp/slog
 golang.org/x/exp/slog/internal
 golang.org/x/exp/slog/internal/buffer
+# golang.org/x/image v0.15.0
+## explicit; go 1.18
+golang.org/x/image/riff
+golang.org/x/image/vp8
+golang.org/x/image/vp8l
+golang.org/x/image/webp
 # golang.org/x/net v0.20.0
 ## explicit; go 1.18
 golang.org/x/net/html

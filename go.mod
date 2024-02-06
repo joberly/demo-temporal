@@ -7,9 +7,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/spf13/viper v1.18.2
+	go.temporal.io/api v1.27.0
 	go.temporal.io/sdk v1.25.1
 	go.uber.org/fx v1.20.1
 	go.uber.org/zap v1.26.0
+	golang.org/x/image v0.15.0
 )
 
 require github.com/chenzhuoyu/iasm v0.9.0 // indirect
@@ -62,7 +64,6 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	go.temporal.io/api v1.27.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

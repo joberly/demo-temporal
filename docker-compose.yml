@@ -6,23 +6,29 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      - DEMO_IMAGE_DIR=/uploads
+      - DEMO_UPLOAD_DIR=/upload
+      - DEMO_PROCESSED_DIR=/processed
     # Temporal will use 8080 so use 8081 instead
     ports:
       - 8081:8080
     volumes:
-      - api-uploads:/uploads
+      - upload:/upload
+      - processed:/processed
     networks:
       - backend
 
-  postgres:
-    image: postgres:${POSTGRES_VERSION}
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      - DEMO_UPLOAD_DIR=/uploads
+      - DEMO_WORKING_DIR=/working
+      - DEMO_PROCESSED_DIR=/processed
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - upload:/uploads
+      - working:/working
+      - processed:/processed
     networks:
       - backend
   
@@ -59,6 +65,7 @@ networks:
     driver: bridge
 
 volumes:
-  postgres-data:
   grafana-storage:
-  api-uploads:
+  upload:
+  working:
+  processed:

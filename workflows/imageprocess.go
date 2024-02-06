@@ -1,27 +1,59 @@
 package workflows
 
 import (
-	"github.com/joberly/demo-temporal/activities"
-
 	"go.temporal.io/sdk/workflow"
 )
 
+// ImageProcessingWorkflowStatus is the status of an image processing workflow.
+type ImageProcessingWorkflowStatus struct {
+	ImageID string
+	Status  string
+	Error   string
+}
+
 // ImageProcessingWorkflow is a Temporal workflow that processes an image.
 func ImageProcessingWorkflow(ctx workflow.Context, imageID string) error {
-	// This is where you would put your image processing logic.
-	// For now, we'll just log the image ID.
-	workflow.GetLogger(ctx).Info("Processing image", "imageID", imageID)
+	workflow.GetLogger(ctx).Info("starting ImageProcessingWorkflow", "imageID", imageID)
 
-	// Run an activity to check the image size.
-	// This is a blocking call, so the workflow will wait for the result.
-	// The result will be stored in the `size` variable.
-	var size int
-	err := workflow.ExecuteActivity(ctx, activities.CheckImageSizeActivity, imageID).Get(ctx, &size)
+	// status of the workflow reported back via query
+	status := ImageProcessingWorkflowStatus{
+		ImageID: imageID,
+		Status:  "starting",
+	}
+
+	// setup a query handler to report the status of the workflow via the api
+	err := workflow.SetQueryHandler(ctx, "status",
+		func() (ImageProcessingWorkflowStatus, error) {
+			return status, nil
+		},
+	)
 	if err != nil {
-		// Return the error to indicate that the workflow failed.
+		status.Status = "error"
+		status.Error = err.Error()
 		return err
 	}
 
-	// Return nil to indicate that the workflow completed successfully.
+	workflow.GetLogger(ctx).Info("processing image", "imageID", imageID)
+
+	// copy image to working directory
+	status.Status = "copying image"
+	err = workflow.ExecuteActivity(ctx, "CopyImageActivity", imageID).Get(ctx, nil)
+	if err != nil {
+		status.Status = "error copying image"
+		status.Error = err.Error()
+		return err
+	}
+
+	// convert image to grayscale
+	status.Status = "converting image to grayscale"
+	err = workflow.ExecuteActivity(ctx, "GrayscaleImageActivity", imageID).Get(ctx, nil)
+	if err != nil {
+		status.Status = "error converting image to grayscale"
+		status.Error = err.Error()
+		return err
+	}
+
+	// workflow successfully completed
+	workflow.GetLogger(ctx).Info("image processing complete", "imageID", imageID)
 	return nil
 }
