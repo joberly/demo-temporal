@@ -45,7 +45,8 @@ func New(params *ApiParams) (*Api, error) {
 
 func (a *Api) Run() {
 	a.router.POST("/upload", a.uploadHandler)
-	a.router.GET("/status/:id", a.statusHandler)
+	a.router.GET("/status/:workflowId/run:runId", a.statusHandler)
+	a.router.GET("/download/:imageId", a.downloadHandler)
 	a.router.GET("/health", a.healthHandler)
 	a.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
@@ -105,7 +106,7 @@ func (a *Api) downloadHandler(c *gin.Context) {
 
 	// check the image id to be sure it's just a uuid
 	regexPattern := `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`
-	matched, _ := regexp.MatchString(regexPattern, uuid)
+	matched, _ := regexp.MatchString(regexPattern, imageID)
 	if !matched {
 		a.logger.Error("invalid image id", zap.String("imageId", imageID))
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -137,10 +138,12 @@ func (a *Api) downloadHandler(c *gin.Context) {
 }
 
 func (a *Api) statusHandler(c *gin.Context) {
-	runID := c.Param("runId")
 	workflowID := c.Param("workflowId")
+	runID := c.Param("runId")
 
-	a.logger.Info("received image status request", zap.String("runId", runID))
+	a.logger.Info("received image status request",
+		zap.String("workflowId", workflowID),
+		zap.String("runId", runID))
 
 	// get Temporal workflow status
 	_, err := a.client.DescribeWorkflowExecution(c.Request.Context(),
