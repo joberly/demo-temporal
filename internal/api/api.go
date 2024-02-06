@@ -45,7 +45,7 @@ func New(params ApiParams) (*Api, error) {
 
 func (a *Api) Run() {
 	a.router.POST("/upload", a.uploadHandler)
-	a.router.GET("/status/:workflowId/run:runId", a.statusHandler)
+	a.router.GET("/status/:workflowId/run/:runId", a.statusHandler)
 	a.router.GET("/download/:imageId", a.downloadHandler)
 	a.router.GET("/health", a.healthHandler)
 	a.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
